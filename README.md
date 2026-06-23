@@ -8,6 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
+| v1.0.7 | [`v1.0.7`](https://github.com/chainguard-actions/sparksp-elm-review-action/tree/v1.0.7) | [`73c9e54`](https://github.com/sparksp/elm-review-action/commit/73c9e540b3e90ce1cacc1e9092253d713cc2a7e0) |
 | v1.2.0 | [`v1.2.0`](https://github.com/chainguard-actions/sparksp-elm-review-action/tree/v1.2.0) | [`392d83b`](https://github.com/sparksp/elm-review-action/commit/392d83b512d9ab818a5b1588599248944416311f) |
 
 ## Privacy
