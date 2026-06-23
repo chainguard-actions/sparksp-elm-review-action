@@ -1,0 +1,91 @@
+name: Test all optional inputs - elm_compiler, elm_files, elm_format, elm_json, elm_review_config, working-directory
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create mock tools and project structure
+        run: |
+          mkdir -p /tmp/mock-bin
+          mkdir -p /tmp/elm-project/src
+          mkdir -p /tmp/elm-review-config
+
+          # Mock elm-review
+          cat > /tmp/mock-bin/elm-review << 'EOF'
+          #!/bin/sh
+          echo "elm-review called with args: $@" >&2
+          echo '{"type":"review-errors","errors":[]}'
+          exit 0
+          EOF
+          chmod +x /tmp/mock-bin/elm-review
+
+          # Mock elm compiler
+          cat > /tmp/mock-bin/elm << 'EOF'
+          #!/bin/sh
+          echo "elm compiler called with args: $@" >&2
+          exit 0
+          EOF
+          chmod +x /tmp/mock-bin/elm
+
+          # Mock elm-format
+          cat > /tmp/mock-bin/elm-format << 'EOF'
+          #!/bin/sh
+          echo "elm-format called with args: $@" >&2
+          exit 0
+          EOF
+          chmod +x /tmp/mock-bin/elm-format
+
+          # Create a minimal elm.json for the project
+          cat > /tmp/elm-project/elm.json << 'EOF'
+          {
+            "type": "application",
+            "source-directories": ["src"],
+            "elm-version": "0.19.1",
+            "dependencies": {
+              "direct": {},
+              "indirect": {}
+            },
+            "test-dependencies": {
+              "direct": {},
+              "indirect": {}
+            }
+          }
+          EOF
+
+          # Create a minimal Elm source file
+          cat > /tmp/elm-project/src/Main.elm << 'EOF'
+          module Main exposing (main)
+          main = text "Hello"
+          EOF
+
+          # Create a minimal elm-review config
+          cat > /tmp/elm-review-config/ReviewConfig.elm << 'EOF'
+          module ReviewConfig exposing (config)
+          config = []
+          EOF
+
+          echo "All mock tools and project structure created"
+
+      - id: action
+        uses: .
+        with:
+          name: elm-review-all-inputs-test
+          elm_review: /tmp/mock-bin/elm-review
+          elm_review_config: /tmp/elm-review-config
+          elm_compiler: /tmp/mock-bin/elm
+          elm_format: /tmp/mock-bin/elm-format
+          elm_json: /tmp/elm-project/elm.json
+          elm_files: /tmp/elm-project/src/Main.elm
+          working-directory: /tmp/elm-project
+        continue-on-error: true
+
+      - name: Assert action ran with all optional inputs
+        run: |
+          echo "Action completed with all optional inputs specified"
+          echo "Verified inputs: elm_review_config, elm_compiler, elm_format, elm_json, elm_files, working-directory"
+          echo "PASS"

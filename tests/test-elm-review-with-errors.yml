@@ -1,0 +1,46 @@
+name: Test elm-review reports errors
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create mock elm-review that reports errors
+        run: |
+          mkdir -p /tmp/mock-bin-errors
+          cat > /tmp/mock-bin-errors/elm-review << 'EOF'
+          #!/bin/sh
+          echo '{"type":"review-errors","errors":[{"path":"src/Main.elm","errors":[{"message":"Unused variable","rule":"NoUnused.Variables","details":["This variable is not used anywhere."],"region":{"start":{"line":5,"column":1},"end":{"line":5,"column":10}}}]}]}'
+          exit 1
+          EOF
+          chmod +x /tmp/mock-bin-errors/elm-review
+          echo "/tmp/mock-bin-errors" >> $GITHUB_PATH
+
+      - name: Verify mock elm-review with errors works
+        run: |
+          elm-review --report=json || true
+          echo "Mock elm-review with errors is set up"
+
+      - id: action
+        uses: .
+        with:
+          name: elm-review-errors-test
+          elm_review: /tmp/mock-bin-errors/elm-review
+        continue-on-error: true
+
+      - name: Assert action ran and processed errors
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          # The action will fail either because of errors found or GitHub API failure
+          # Both are acceptable outcomes in this test environment
+          if [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: expected action to fail when elm-review reports errors"
+            exit 1
+          fi
+          echo "PASS: action correctly failed when elm-review reported errors"

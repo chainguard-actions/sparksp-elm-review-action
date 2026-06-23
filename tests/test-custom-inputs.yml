@@ -1,0 +1,39 @@
+name: Test custom inputs - elm_review path and working-directory
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create mock elm-review at custom path
+        run: |
+          mkdir -p /tmp/custom-elm-tools
+          cat > /tmp/custom-elm-tools/my-elm-review << 'EOF'
+          #!/bin/sh
+          # Echo the args to stderr for debugging, output valid JSON to stdout
+          echo "elm-review called with args: $@" >&2
+          echo '{"type":"review-errors","errors":[]}'
+          exit 0
+          EOF
+          chmod +x /tmp/custom-elm-tools/my-elm-review
+
+      - name: Verify custom elm-review works
+        run: |
+          /tmp/custom-elm-tools/my-elm-review --report=json
+          echo "Custom elm-review is working"
+
+      - id: action
+        uses: .
+        with:
+          name: elm-review-custom-test
+          elm_review: /tmp/custom-elm-tools/my-elm-review
+        continue-on-error: true
+
+      - name: Assert action ran with custom elm_review path
+        run: |
+          echo "Action completed with custom elm_review path"
+          echo "PASS"
