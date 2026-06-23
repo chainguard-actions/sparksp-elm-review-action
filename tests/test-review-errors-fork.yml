@@ -1,0 +1,63 @@
+name: Test elm-review with errors in fork PR
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+      GITHUB_EVENT_NAME: pull_request
+      GITHUB_REF: refs/pull/1/merge
+      GITHUB_HEAD_REF: feature-branch
+      GITHUB_BASE_REF: main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create fake elm-review script that returns errors
+        run: |
+          mkdir -p /tmp/fake-bin
+          cat > /tmp/fake-bin/elm-review << 'EOF'
+          #!/bin/bash
+          echo '{"type":"review-errors","errors":[{"path":"src/Main.elm","errors":[{"message":"Unused variable","rule":"NoUnused.Variables","details":["This variable is unused."],"region":{"start":{"line":5,"column":1},"end":{"line":5,"column":10}}}]}]}'
+          exit 1
+          EOF
+          chmod +x /tmp/fake-bin/elm-review
+          echo "/tmp/fake-bin" >> $GITHUB_PATH
+
+      - name: Create fake event payload for fork PR
+        run: |
+          mkdir -p /tmp/event
+          cat > /tmp/event/event.json << 'EOF'
+          {
+            "pull_request": {
+              "head": {
+                "sha": "abc123",
+                "repo": {
+                  "full_name": "fork-user/repo"
+                }
+              }
+            },
+            "repository": {
+              "full_name": "owner/repo"
+            }
+          }
+          EOF
+          echo "GITHUB_EVENT_PATH=/tmp/event/event.json" >> $GITHUB_ENV
+
+      - id: action
+        uses: .
+        with:
+          name: elm-review
+          elm_review: elm-review
+        continue-on-error: true
+
+      - name: Assert action detected errors and set failure
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected action to fail when elm-review reports errors, got: $OUTCOME"
+            exit 1
+          fi
+          echo "PASS: action correctly failed when elm-review reported errors"

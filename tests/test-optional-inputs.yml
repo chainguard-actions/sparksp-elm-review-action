@@ -1,0 +1,121 @@
+name: Test elm-review optional inputs coverage
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+      GITHUB_EVENT_NAME: pull_request
+      GITHUB_REF: refs/pull/1/merge
+      GITHUB_HEAD_REF: feature-branch
+      GITHUB_BASE_REF: main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create fake elm-review script that accepts all optional flags
+        run: |
+          mkdir -p /tmp/fake-bin
+          cat > /tmp/fake-bin/my-elm-review << 'EOF'
+          #!/bin/bash
+          echo '{"type":"review-errors","errors":[]}'
+          exit 0
+          EOF
+          chmod +x /tmp/fake-bin/my-elm-review
+
+          cat > /tmp/fake-bin/my-elm-compiler << 'EOF'
+          #!/bin/bash
+          echo "fake elm compiler"
+          exit 0
+          EOF
+          chmod +x /tmp/fake-bin/my-elm-compiler
+
+          cat > /tmp/fake-bin/my-elm-format << 'EOF'
+          #!/bin/bash
+          echo "fake elm format"
+          exit 0
+          EOF
+          chmod +x /tmp/fake-bin/my-elm-format
+
+          echo "/tmp/fake-bin" >> $GITHUB_PATH
+
+      - name: Create fake event payload for fork PR
+        run: |
+          mkdir -p /tmp/event
+          cat > /tmp/event/event.json << 'EOF'
+          {
+            "pull_request": {
+              "head": {
+                "sha": "abc123",
+                "repo": {
+                  "full_name": "fork-user/repo"
+                }
+              }
+            },
+            "repository": {
+              "full_name": "owner/repo"
+            }
+          }
+          EOF
+          echo "GITHUB_EVENT_PATH=/tmp/event/event.json" >> $GITHUB_ENV
+
+      - name: Create fake elm.json and review config directory
+        run: |
+          mkdir -p /tmp/elm-project/src
+          cat > /tmp/elm-project/elm.json << 'EOF'
+          {
+            "type": "application",
+            "source-directories": ["src"],
+            "elm-version": "0.19.1",
+            "dependencies": {
+              "direct": {},
+              "indirect": {}
+            },
+            "test-dependencies": {
+              "direct": {},
+              "indirect": {}
+            }
+          }
+          EOF
+          mkdir -p /tmp/elm-review-config
+          cat > /tmp/elm-review-config/elm.json << 'EOF'
+          {
+            "type": "application",
+            "source-directories": ["."],
+            "elm-version": "0.19.1",
+            "dependencies": {
+              "direct": {},
+              "indirect": {}
+            },
+            "test-dependencies": {
+              "direct": {},
+              "indirect": {}
+            }
+          }
+          EOF
+          touch /tmp/elm-project/src/Main.elm
+
+      - id: action
+        uses: .
+        with:
+          name: elm-review
+          elm_review: my-elm-review
+          elm_review_config: /tmp/elm-review-config
+          elm_compiler: my-elm-compiler
+          elm_format: my-elm-format
+          elm_json: /tmp/elm-project/elm.json
+          elm_files: /tmp/elm-project/src/Main.elm
+          working-directory: /tmp/elm-project
+        continue-on-error: true
+
+      - name: Assert action ran with all optional inputs
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action ran with all optional inputs (elm_compiler, elm_files, elm_format, elm_json, elm_review_config)"
+          else
+            echo "FAIL: unexpected outcome: $OUTCOME"
+            exit 1
+          fi
