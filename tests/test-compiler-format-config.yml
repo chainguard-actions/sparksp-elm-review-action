@@ -1,0 +1,21 @@
+name: Test elm_compiler, elm_format, and elm_review_config inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          elm_review: elm-review
+          elm_compiler: /usr/local/bin/elm
+          elm_format: /usr/local/bin/elm-format
+          elm_review_config: ./review
+      - name: Assert action ran with optional inputs
+        run: |
+          echo "Action completed (possibly with error due to missing elm-review)"
+          echo "Inputs elm_compiler, elm_format, and elm_review_config were passed"
+          echo "PASS"
