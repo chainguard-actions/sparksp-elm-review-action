@@ -1,0 +1,52 @@
+name: Test elm_review_config input passes --config flag
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create mock elm-review that captures args and checks for --config
+        run: |
+          mkdir -p /tmp/mock-bin
+          cat > /tmp/mock-bin/elm-review << 'EOF'
+          #!/bin/bash
+          # Write args to a file for inspection
+          echo "$@" > /tmp/elm-review-args.txt
+          # Check if --config flag was passed
+          if echo "$@" | grep -q -- '--config'; then
+            echo '{"type":"review-errors","errors":[]}'
+            exit 0
+          else
+            echo "FAIL: --config flag not found in args: $@" >&2
+            exit 2
+          fi
+          EOF
+          chmod +x /tmp/mock-bin/elm-review
+
+      - id: action
+        uses: .
+        with:
+          elm_review: /tmp/mock-bin/elm-review
+          elm_review_config: /tmp/review-config
+        continue-on-error: true
+
+      - name: Assert --config flag was passed to elm-review
+        run: |
+          echo "Action outcome: ${{ steps.action.outcome }}"
+          if [ -f /tmp/elm-review-args.txt ]; then
+            ARGS=$(cat /tmp/elm-review-args.txt)
+            echo "elm-review args: $ARGS"
+            if echo "$ARGS" | grep -q -- '--config'; then
+              echo "PASS: --config flag was passed to elm-review"
+            else
+              echo "FAIL: --config flag was not passed to elm-review"
+              exit 1
+            fi
+          else
+            echo "FAIL: elm-review was not called (args file not found)"
+            exit 1
+          fi

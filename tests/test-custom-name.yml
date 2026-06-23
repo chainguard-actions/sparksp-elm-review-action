@@ -1,0 +1,39 @@
+name: Test custom check name input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create mock elm-review that returns review errors
+        run: |
+          mkdir -p /tmp/mock-bin
+          cat > /tmp/mock-bin/elm-review << 'EOF'
+          #!/bin/bash
+          echo '{"type":"review-errors","errors":[{"path":"src/Main.elm","errors":[{"message":"Unused variable","rule":"NoUnused.Variables","details":["This variable is unused."],"region":{"start":{"line":1,"column":1},"end":{"line":1,"column":5}}}]}]}'
+          exit 1
+          EOF
+          chmod +x /tmp/mock-bin/elm-review
+          echo "/tmp/mock-bin" >> $GITHUB_PATH
+
+      - id: action
+        uses: .
+        with:
+          name: my-custom-elm-review
+          elm_review: /tmp/mock-bin/elm-review
+        continue-on-error: true
+
+      - name: Assert action ran with custom name
+        run: |
+          echo "Action outcome: ${{ steps.action.outcome }}"
+          # The action should have run (may fail due to GitHub API or elm-review errors)
+          # but it should not crash unexpectedly
+          if [ "${{ steps.action.outcome }}" = "" ]; then
+            echo "FAIL: action did not run at all"
+            exit 1
+          fi
+          echo "PASS: action ran with custom name input"

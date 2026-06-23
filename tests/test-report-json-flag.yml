@@ -1,0 +1,45 @@
+name: Test action always passes --report=json flag to elm-review
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create mock elm-review that captures args and verifies --report=json
+        run: |
+          mkdir -p /tmp/mock-bin
+          cat > /tmp/mock-bin/elm-review << 'EOF'
+          #!/bin/bash
+          # Write args to a file for inspection
+          echo "$@" > /tmp/elm-review-args.txt
+          echo '{"type":"review-errors","errors":[]}'
+          exit 0
+          EOF
+          chmod +x /tmp/mock-bin/elm-review
+
+      - id: action
+        uses: .
+        with:
+          elm_review: /tmp/mock-bin/elm-review
+        continue-on-error: true
+
+      - name: Assert --report=json flag was passed to elm-review
+        run: |
+          echo "Action outcome: ${{ steps.action.outcome }}"
+          if [ -f /tmp/elm-review-args.txt ]; then
+            ARGS=$(cat /tmp/elm-review-args.txt)
+            echo "elm-review args: $ARGS"
+            if echo "$ARGS" | grep -q -- '--report=json'; then
+              echo "PASS: --report=json flag was passed to elm-review"
+            else
+              echo "FAIL: --report=json flag was not passed to elm-review"
+              exit 1
+            fi
+          else
+            echo "FAIL: elm-review was not called (args file not found)"
+            exit 1
+          fi

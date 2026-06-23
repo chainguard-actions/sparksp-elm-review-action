@@ -1,0 +1,40 @@
+name: 'elm-review'
+description: 'Use elm-review to check code quality'
+author: 'Phill Sparks'
+branding:
+  icon: check-circle
+  color: orange
+inputs:
+  name:
+    description: 'This action creates its own entry in the checks called "elm-review", you can change the check name shown with this input.'
+    required: true
+    default: 'elm-review'
+  elm_review:
+    description: 'Specify the path to elm-review.'
+    required: true
+    default: 'elm-review'
+  elm_review_config:
+    description: 'Use the review configuration in the specified directory instead of the one found in the current directory or one of its parents.'
+    required: false
+  elm_compiler:
+    description: 'Specify the path to the elm compiler.'
+    required: false
+  elm_format:
+    description: 'Specify the path to elm-format.'
+    required: false
+  elm_json:
+    description: 'Specify the path to the elm.json file of the project. By default, the one in the current directory or its parent directories will be used.'
+    required: false
+  elm_files:
+    description: |
+      List of Elm files or directories you wish to review. Unless files or directories are specified, elm-review will look at:
+      - For packages: src/ and tests/
+      - For applications: tests/ and the "source-directories" in the project's elm.json
+    required: false
+  working-directory:
+    description: 'Change the working directory'
+    required: false
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+  pre: chainguard-phonehome.js

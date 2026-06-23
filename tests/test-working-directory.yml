@@ -1,0 +1,47 @@
+name: Test working-directory input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: fake-token-for-testing
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create working directory and mock elm-review
+        run: |
+          mkdir -p /tmp/my-elm-project
+          mkdir -p /tmp/mock-bin
+          cat > /tmp/mock-bin/elm-review << 'EOF'
+          #!/bin/bash
+          # Write current working directory to a file for inspection
+          pwd > /tmp/elm-review-cwd.txt
+          echo '{"type":"review-errors","errors":[]}'
+          exit 0
+          EOF
+          chmod +x /tmp/mock-bin/elm-review
+
+      - id: action
+        uses: .
+        with:
+          elm_review: /tmp/mock-bin/elm-review
+          working-directory: /tmp/my-elm-project
+        continue-on-error: true
+
+      - name: Assert elm-review ran in the specified working directory
+        run: |
+          echo "Action outcome: ${{ steps.action.outcome }}"
+          if [ -f /tmp/elm-review-cwd.txt ]; then
+            CWD=$(cat /tmp/elm-review-cwd.txt)
+            echo "elm-review cwd: $CWD"
+            if [ "$CWD" = "/tmp/my-elm-project" ]; then
+              echo "PASS: elm-review ran in the correct working directory"
+            else
+              echo "FAIL: expected /tmp/my-elm-project but got $CWD"
+              exit 1
+            fi
+          else
+            echo "FAIL: elm-review was not called (cwd file not found)"
+            exit 1
+          fi
