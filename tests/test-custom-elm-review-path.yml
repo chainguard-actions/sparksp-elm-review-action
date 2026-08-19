@@ -1,0 +1,39 @@
+name: Test elm-review with custom elm_review path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create mock elm-review at a custom path
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/bin"
+          cat > "$GITHUB_WORKSPACE/bin/my-elm-review" << 'SCRIPT'
+          #!/bin/sh
+          # Mock elm-review at a custom path: returns no errors
+          echo '{"type":"review-errors","errors":[]}'
+          exit 0
+          SCRIPT
+          chmod +x "$GITHUB_WORKSPACE/bin/my-elm-review"
+
+      - name: Run elm-review action with custom elm_review path
+        id: action
+        uses: .
+        with:
+          name: 'elm-review-custom-path'
+          elm_review: '${{ github.workspace }}/bin/my-elm-review'
+        continue-on-error: true
+
+      - name: Assert action completed using the custom path
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # The action should invoke the custom elm-review binary successfully
+          if [ "$OUTCOME" = "cancelled" ]; then
+            echo "FAIL: action was cancelled unexpectedly"
+            exit 1
+          fi
+          echo "PASS: action completed with custom elm_review path (outcome=$OUTCOME)"

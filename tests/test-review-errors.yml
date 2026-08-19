@@ -1,0 +1,44 @@
+name: Test elm-review with review errors found
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock elm-review (with errors)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/elm-review" << 'SCRIPT'
+          #!/bin/sh
+          # Mock elm-review: returns a JSON report with one review error
+          echo '{"type":"review-errors","errors":[{"path":"src/Main.elm","errors":[{"message":"Unused variable `foo`","rule":"NoUnused.Variables","details":["You defined `foo` but it is never used."],"region":{"start":{"line":5,"column":1},"end":{"line":5,"column":4}}}]}]}'
+          exit 1
+          SCRIPT
+          chmod +x "$HOME/.local/bin/elm-review"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run elm-review action (errors expected)
+        id: action
+        uses: .
+        with:
+          name: 'elm-review-test'
+          elm_review: 'elm-review'
+        continue-on-error: true
+
+      - name: Assert action reported failure due to review errors
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # When elm-review finds errors, the action should fail (not succeed)
+          if [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: expected action to fail when review errors are found"
+            exit 1
+          fi
+          if [ "$OUTCOME" = "cancelled" ]; then
+            echo "FAIL: action was cancelled unexpectedly"
+            exit 1
+          fi
+          echo "PASS: action correctly reported failure (outcome=$OUTCOME)"
